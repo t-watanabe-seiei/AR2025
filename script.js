@@ -9,7 +9,7 @@ AFRAME.registerComponent('touch-controls', {
         
         // デバウンスのための変数
         this.lastInteractionTime = 0;
-        this.interactionThrottle = 16; // 60fps制限
+        this.interactionThrottle = 8; // 反応性を向上（16→8ms）
         
         // マーカーの状態を監視
         const marker = this.el.parentEl;
@@ -91,7 +91,10 @@ AFRAME.registerComponent('touch-controls', {
             const deltaX = event.touches[0].clientX - this.previousTouch.x;
             const deltaY = event.touches[0].clientY - this.previousTouch.y;
             
-            this.rotateModel(deltaX, deltaY);
+            // 最小移動距離を下げて反応性向上
+            if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+                this.rotateModel(deltaX, deltaY);
+            }
             
             this.previousTouch = {
                 x: event.touches[0].clientX,
@@ -143,7 +146,10 @@ AFRAME.registerComponent('touch-controls', {
         const deltaX = event.clientX - this.previousTouch.x;
         const deltaY = event.clientY - this.previousTouch.y;
         
-        this.rotateModel(deltaX, deltaY);
+        // 最小移動距離を下げて反応性向上
+        if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+            this.rotateModel(deltaX, deltaY);
+        }
         
         this.previousTouch = {
             x: event.clientX,
@@ -164,7 +170,7 @@ AFRAME.registerComponent('touch-controls', {
         if (!this.el || !this.isMarkerVisible) return;
         
         const currentRotation = this.el.getAttribute('rotation');
-        const sensitivity = 0.3; // デプロイ環境では感度を下げる
+        const sensitivity = 1.5; // 感度を大幅に上げて少しのドラッグでも大きく回転
         
         const newRotation = {
             x: Math.max(-90, Math.min(90, currentRotation.x - deltaY * sensitivity)),
