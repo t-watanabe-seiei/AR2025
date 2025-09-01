@@ -9,7 +9,7 @@ AFRAME.registerComponent('touch-controls', {
         
         // デバウンスのための変数
         this.lastInteractionTime = 0;
-        this.interactionThrottle = 8; // 反応性を向上（16→8ms）
+        this.interactionThrottle = 4; // 最高レベルの反応性（8→4ms）
         
         // マーカーの状態を監視
         const marker = this.el.parentEl;
@@ -91,10 +91,8 @@ AFRAME.registerComponent('touch-controls', {
             const deltaX = event.touches[0].clientX - this.previousTouch.x;
             const deltaY = event.touches[0].clientY - this.previousTouch.y;
             
-            // 最小移動距離を下げて反応性向上
-            if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-                this.rotateModel(deltaX, deltaY);
-            }
+            // 最小移動距離制限を削除し、どんな小さな動きにも反応
+            this.rotateModel(deltaX, deltaY);
             
             this.previousTouch = {
                 x: event.touches[0].clientX,
@@ -146,10 +144,8 @@ AFRAME.registerComponent('touch-controls', {
         const deltaX = event.clientX - this.previousTouch.x;
         const deltaY = event.clientY - this.previousTouch.y;
         
-        // 最小移動距離を下げて反応性向上
-        if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
-            this.rotateModel(deltaX, deltaY);
-        }
+        // 最小移動距離制限を削除し、どんな小さな動きにも反応
+        this.rotateModel(deltaX, deltaY);
         
         this.previousTouch = {
             x: event.clientX,
@@ -170,7 +166,7 @@ AFRAME.registerComponent('touch-controls', {
         if (!this.el || !this.isMarkerVisible) return;
         
         const currentRotation = this.el.getAttribute('rotation');
-        const sensitivity = 1.5; // 感度を大幅に上げて少しのドラッグでも大きく回転
+        const sensitivity = 3.0; // 感度を最大レベルまで上げて、わずかなドラッグでも大きく回転
         
         const newRotation = {
             x: Math.max(-90, Math.min(90, currentRotation.x - deltaY * sensitivity)),
@@ -178,11 +174,11 @@ AFRAME.registerComponent('touch-controls', {
             z: currentRotation.z
         };
         
-        // アニメーションでスムーズに変更
+        // アニメーションでスムーズに変更（より高速に）
         this.el.setAttribute('animation__rotation', {
             property: 'rotation',
             to: `${newRotation.x} ${newRotation.y} ${newRotation.z}`,
-            dur: 50,
+            dur: 25,
             easing: 'linear'
         });
     },
