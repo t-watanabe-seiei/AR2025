@@ -48,18 +48,17 @@
         
         <!-- アセット管理 -->
         <a-assets>
-            <a-asset-item id="duckModel" src="assets/models/duck.gltf"></a-asset-item>
+            <a-asset-item id="akaeiModel" src="assets/models/akaei.glb"></a-asset-item>
         </a-assets>
         
         <!-- HIROマーカー -->
         <a-marker preset="hiro" id="hiromMarker">
             <!-- 3Dモデル配置 -->
             <a-gltf-model 
-                src="#duckModel"
+                src="#akaeiModel"
                 position="0 0 0"
-                scale="0.5 0.5 0.5"
-                rotation="0 0 0"
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+                scale="3 3 3"
+                rotation="0 0 0">
             </a-gltf-model>
         </a-marker>
         
