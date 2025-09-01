@@ -1,20 +1,29 @@
-// アプリケーション初期化
+// シンプルなARアプリケーション（デバッグ版）
+console.log('Script loaded successfully');
+
 class ARApp {
     constructor() {
+        console.log('ARApp constructor called');
         this.isARReady = false;
-        this.marker = null;
-        this.model = null;
         this.init();
     }
     
     async init() {
+        console.log('ARApp init started');
         try {
+            console.log('Checking browser support...');
             await this.checkBrowserSupport();
+            
+            console.log('Requesting camera permission...');
             await this.requestCameraPermission();
+            
+            console.log('Setting up AR scene...');
             this.setupARScene();
-            this.setupEventListeners();
+            
+            console.log('Hiding loading screen...');
             this.hideLoadingScreen();
         } catch (error) {
+            console.error('ARApp init error:', error);
             this.handleError(error);
         }
     }
@@ -22,42 +31,52 @@ class ARApp {
     // ブラウザサポート確認
     checkBrowserSupport() {
         return new Promise((resolve, reject) => {
+            console.log('Checking getUserMedia support...');
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.error('getUserMedia not supported');
                 reject(new Error('カメラアクセスがサポートされていません'));
                 return;
             }
             
+            console.log('Checking A-Frame support...');
             if (!window.AFRAME) {
+                console.error('A-Frame not loaded');
                 reject(new Error('A-Frameが読み込まれていません'));
                 return;
             }
             
+            console.log('Browser support check passed');
             resolve();
         });
     }
     
-    // カメラ権限要求（高解像度対応）
+    // カメラ権限要求（スマホ向け最適化）
     async requestCameraPermission() {
         try {
+            console.log('Setting up camera constraints...');
             const constraints = { 
                 video: { 
                     facingMode: 'environment',
-                    width: { ideal: 1280, max: 1920 },
-                    height: { ideal: 720, max: 1080 }
+                    width: { ideal: 800, max: 1280 },
+                    height: { ideal: 600, max: 720 }
                 } 
             };
             
-            // iOS Safari の場合の最適化
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            if (isIOS) {
+            // モバイルデバイスの検出
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('Is mobile device:', isMobile);
+            
+            if (isMobile) {
                 constraints.video = {
                     facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    width: { ideal: 800 },
+                    height: { ideal: 600 }
                 };
             }
             
+            console.log('Requesting camera access with constraints:', constraints);
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('Camera access granted, stopping test stream');
             stream.getTracks().forEach(track => track.stop());
             return true;
         } catch (error) {
@@ -68,72 +87,90 @@ class ARApp {
     
     // ARシーン設定
     setupARScene() {
+        console.log('Setting up AR scene...');
+        
         // シーンが完全に初期化されるまで待つ
         setTimeout(() => {
-            this.marker = document.querySelector('#hiromMarker');
-            this.model = document.querySelector('#interactiveModel');
+            console.log('AR scene setup timeout triggered');
+            const scene = document.querySelector('a-scene');
+            console.log('Scene element:', scene);
             
-            if (this.marker) {
-                // マーカー検出イベント
-                this.marker.addEventListener('markerFound', () => {
-                    console.log('マーカーを検出しました');
-                    this.onMarkerFound();
-                });
+            if (scene) {
+                const canvas = scene.canvas;
+                console.log('Canvas element:', canvas);
                 
-                this.marker.addEventListener('markerLost', () => {
-                    console.log('マーカーを見失いました');
-                    this.onMarkerLost();
-                });
+                if (canvas) {
+                    console.log('Applying canvas styles...');
+                    // スマホ表示問題の修正
+                    canvas.style.position = 'fixed';
+                    canvas.style.top = '0';
+                    canvas.style.left = '0';
+                    canvas.style.width = '100vw';
+                    canvas.style.height = '100vh';
+                    canvas.style.objectFit = 'cover';
+                    canvas.style.zIndex = '1';
+                }
+                
+                // ビデオ要素も修正
+                const video = scene.querySelector('video');
+                console.log('Video element:', video);
+                if (video) {
+                    console.log('Applying video styles...');
+                    video.style.position = 'fixed';
+                    video.style.top = '0';
+                    video.style.left = '0';
+                    video.style.width = '100vw';
+                    video.style.height = '100vh';
+                    video.style.objectFit = 'cover';
+                    video.style.zIndex = '1';
+                }
             }
             
-            // デバイス方向の変更監視
+            // デバイス方向変更時の対応
             window.addEventListener('orientationchange', () => {
+                console.log('Orientation change detected');
                 setTimeout(() => {
-                    // iOS Safari でのレイアウト修正
                     const scene = document.querySelector('a-scene');
-                    if (scene && scene.canvas) {
-                        scene.canvas.style.width = '100vw';
-                        scene.canvas.style.height = '100vh';
+                    if (scene) {
+                        const canvas = scene.canvas;
+                        const video = scene.querySelector('video');
+                        
+                        if (canvas) {
+                            canvas.style.width = '100vw';
+                            canvas.style.height = '100vh';
+                        }
+                        if (video) {
+                            video.style.width = '100vw';
+                            video.style.height = '100vh';
+                        }
                     }
+                    
+                    // viewport高さの再計算
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
                 }, 500);
             });
             
-            // iOS Safari での viewport 高さ問題の対応
-            const setViewportHeight = () => {
-                const vh = window.innerHeight * 0.01;
-                document.documentElement.style.setProperty('--vh', `${vh}px`);
-            };
-            
-            setViewportHeight();
-            window.addEventListener('resize', setViewportHeight);
-            window.addEventListener('orientationchange', () => {
-                setTimeout(setViewportHeight, 500);
+            // リサイズイベントの対応
+            window.addEventListener('resize', () => {
+                console.log('Resize event detected');
+                const scene = document.querySelector('a-scene');
+                if (scene) {
+                    const canvas = scene.canvas;
+                    const video = scene.querySelector('video');
+                    
+                    if (canvas) {
+                        canvas.style.width = '100vw';
+                        canvas.style.height = '100vh';
+                    }
+                    if (video) {
+                        video.style.width = '100vw';
+                        video.style.height = '100vh';
+                    }
+                }
             });
+            
         }, 1000);
-    }
-    
-    // イベントリスナー設定
-    setupEventListeners() {
-        // ページ非表示時のクリーンアップ
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                this.pauseAR();
-            } else {
-                this.resumeAR();
-            }
-        });
-    }
-    
-    // マーカー検出時の処理
-    onMarkerFound() {
-        // 将来的なアニメーション制御などに使用
-        console.log('3Dモデルを表示中');
-    }
-    
-    // マーカー消失時の処理
-    onMarkerLost() {
-        // 将来的なクリーンアップ処理などに使用
-        console.log('3Dモデルを非表示');
     }
     
     // エラーハンドリング
@@ -143,47 +180,65 @@ class ARApp {
         const errorScreen = document.getElementById('errorScreen');
         const errorMessage = document.getElementById('errorMessage');
         
-        errorMessage.textContent = error.message;
+        if (errorMessage) {
+            errorMessage.textContent = error.message;
+        }
         
-        document.getElementById('loadingScreen').classList.add('hidden');
-        errorScreen.classList.remove('hidden');
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+        }
+        
+        if (errorScreen) {
+            errorScreen.classList.remove('hidden');
+        }
     }
     
     // ローディング画面非表示
     hideLoadingScreen() {
+        console.log('Hiding loading screen...');
         setTimeout(() => {
-            document.getElementById('loadingScreen').classList.add('hidden');
-            document.getElementById('instructionOverlay').classList.remove('hidden');
+            const loadingScreen = document.getElementById('loadingScreen');
+            const instructionOverlay = document.getElementById('instructionOverlay');
+            
+            if (loadingScreen) {
+                console.log('Loading screen found, hiding...');
+                loadingScreen.classList.add('hidden');
+            }
+            
+            if (instructionOverlay) {
+                console.log('Instruction overlay found, showing...');
+                instructionOverlay.classList.remove('hidden');
+            }
         }, 2000);
-    }
-    
-    // AR一時停止
-    pauseAR() {
-        const scene = document.querySelector('a-scene');
-        if (scene) {
-            scene.pause();
-        }
-    }
-    
-    // AR再開
-    resumeAR() {
-        const scene = document.querySelector('a-scene');
-        if (scene) {
-            scene.play();
-        }
     }
 }
 
 // ユーティリティ関数
 function hideInstructions() {
-    document.getElementById('instructionOverlay').classList.add('hidden');
+    console.log('Hiding instructions...');
+    const instructionOverlay = document.getElementById('instructionOverlay');
+    if (instructionOverlay) {
+        instructionOverlay.classList.add('hidden');
+    }
 }
 
 function retryCamera() {
+    console.log('Retrying camera...');
     window.location.reload();
 }
 
 // アプリケーション開始
+console.log('Setting up DOMContentLoaded listener...');
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM content loaded, starting AR App...');
     new ARApp();
 });
+
+// 即座に実行も試す
+if (document.readyState === 'loading') {
+    console.log('Document still loading, waiting for DOMContentLoaded...');
+} else {
+    console.log('Document already loaded, starting AR App immediately...');
+    new ARApp();
+}
