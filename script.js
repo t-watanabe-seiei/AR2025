@@ -1,221 +1,3 @@
-// A-Frameカスタムコンポーネント: タッチ操作（デプロイ対応版）
-AFRAME.registerComponent('touch-controls', {
-    init: function () {
-        this.isDragging = false;
-        this.previousTouch = { x: 0, y: 0 };
-        this.pinchDistance = 0;
-        this.initialScale = this.el.getAttribute('scale');
-        this.isMarkerVisible = false;
-        
-        // デバウンスのための変数
-        this.lastInteractionTime = 0;
-        this.interactionThrottle = 4; // 最高レベルの反応性（8→4ms）
-        
-        // マーカーの状態を監視
-        const marker = this.el.parentEl;
-        if (marker) {
-            marker.addEventListener('markerFound', () => {
-                this.isMarkerVisible = true;
-                this.setupEventListeners();
-            });
-            
-            marker.addEventListener('markerLost', () => {
-                this.isMarkerVisible = false;
-                this.removeEventListeners();
-            });
-        }
-    },
-    
-    setupEventListeners: function() {
-        // 既存のリスナーを削除
-        this.removeEventListeners();
-        
-        // パッシブイベントリスナーで最適化
-        const canvas = this.el.sceneEl.canvas;
-        if (canvas) {
-            // タッチイベント
-            canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
-            canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
-            canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
-            
-            // マウスイベント
-            canvas.addEventListener('mousedown', this.onMouseDown.bind(this), { passive: false });
-            canvas.addEventListener('mousemove', this.onMouseMove.bind(this), { passive: false });
-            canvas.addEventListener('mouseup', this.onMouseUp.bind(this), { passive: false });
-            canvas.addEventListener('mouseleave', this.onMouseUp.bind(this), { passive: false });
-        }
-    },
-    
-    removeEventListeners: function() {
-        const canvas = this.el.sceneEl.canvas;
-        if (canvas) {
-            canvas.removeEventListener('touchstart', this.onTouchStart);
-            canvas.removeEventListener('touchmove', this.onTouchMove);
-            canvas.removeEventListener('touchend', this.onTouchEnd);
-            canvas.removeEventListener('mousedown', this.onMouseDown);
-            canvas.removeEventListener('mousemove', this.onMouseMove);
-            canvas.removeEventListener('mouseup', this.onMouseUp);
-            canvas.removeEventListener('mouseleave', this.onMouseUp);
-        }
-    },
-    
-    onTouchStart: function (event) {
-        if (!this.isMarkerVisible) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        if (event.touches.length === 1) {
-            this.isDragging = true;
-            this.previousTouch = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY
-            };
-        } else if (event.touches.length === 2) {
-            this.isDragging = false;
-            this.pinchDistance = this.getPinchDistance(event.touches);
-        }
-    },
-    
-    onTouchMove: function (event) {
-        if (!this.isMarkerVisible) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        const now = Date.now();
-        if (now - this.lastInteractionTime < this.interactionThrottle) return;
-        this.lastInteractionTime = now;
-        
-        if (event.touches.length === 1 && this.isDragging) {
-            const deltaX = event.touches[0].clientX - this.previousTouch.x;
-            const deltaY = event.touches[0].clientY - this.previousTouch.y;
-            
-            // 最小移動距離制限を削除し、どんな小さな動きにも反応
-            this.rotateModel(deltaX, deltaY);
-            
-            this.previousTouch = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY
-            };
-        } else if (event.touches.length === 2) {
-            const currentPinchDistance = this.getPinchDistance(event.touches);
-            if (this.pinchDistance > 0) {
-                const scaleRatio = currentPinchDistance / this.pinchDistance;
-                this.scaleModel(scaleRatio);
-            }
-            this.pinchDistance = currentPinchDistance;
-        }
-    },
-    
-    onTouchEnd: function (event) {
-        if (!this.isMarkerVisible) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        this.isDragging = false;
-        this.pinchDistance = 0;
-    },
-    
-    onMouseDown: function (event) {
-        if (!this.isMarkerVisible) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        this.isDragging = true;
-        this.previousTouch = {
-            x: event.clientX,
-            y: event.clientY
-        };
-    },
-    
-    onMouseMove: function (event) {
-        if (!this.isMarkerVisible || !this.isDragging) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        const now = Date.now();
-        if (now - this.lastInteractionTime < this.interactionThrottle) return;
-        this.lastInteractionTime = now;
-        
-        const deltaX = event.clientX - this.previousTouch.x;
-        const deltaY = event.clientY - this.previousTouch.y;
-        
-        // 最小移動距離制限を削除し、どんな小さな動きにも反応
-        this.rotateModel(deltaX, deltaY);
-        
-        this.previousTouch = {
-            x: event.clientX,
-            y: event.clientY
-        };
-    },
-    
-    onMouseUp: function (event) {
-        if (!this.isMarkerVisible) return;
-        
-        event.preventDefault();
-        event.stopPropagation();
-        
-        this.isDragging = false;
-    },
-    
-    rotateModel: function (deltaX, deltaY) {
-        if (!this.el || !this.isMarkerVisible) return;
-        
-        const currentRotation = this.el.getAttribute('rotation');
-        const sensitivity = 3.0; // 感度を最大レベルまで上げて、わずかなドラッグでも大きく回転
-        
-        const newRotation = {
-            x: Math.max(-90, Math.min(90, currentRotation.x - deltaY * sensitivity)),
-            y: currentRotation.y + deltaX * sensitivity,
-            z: currentRotation.z
-        };
-        
-        // アニメーションでスムーズに変更（より高速に）
-        this.el.setAttribute('animation__rotation', {
-            property: 'rotation',
-            to: `${newRotation.x} ${newRotation.y} ${newRotation.z}`,
-            dur: 25,
-            easing: 'linear'
-        });
-    },
-    
-    scaleModel: function (scaleRatio) {
-        if (!this.el || !this.isMarkerVisible) return;
-        
-        const currentScale = this.el.getAttribute('scale');
-        const clampedRatio = Math.max(0.9, Math.min(1.1, scaleRatio)); // 変化量を制限
-        
-        const newScale = {
-            x: Math.max(0.5, Math.min(8, currentScale.x * clampedRatio)),
-            y: Math.max(0.5, Math.min(8, currentScale.y * clampedRatio)),
-            z: Math.max(0.5, Math.min(8, currentScale.z * clampedRatio))
-        };
-        
-        // アニメーションでスムーズに変更
-        this.el.setAttribute('animation__scale', {
-            property: 'scale',
-            to: `${newScale.x} ${newScale.y} ${newScale.z}`,
-            dur: 50,
-            easing: 'linear'
-        });
-    },
-    
-    getPinchDistance: function (touches) {
-        if (touches.length < 2) return 0;
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    },
-    
-    remove: function() {
-        this.removeEventListeners();
-    }
-});
-
 // アプリケーション初期化
 class ARApp {
     constructor() {
@@ -254,24 +36,24 @@ class ARApp {
         });
     }
     
-    // カメラ権限要求
+    // カメラ権限要求（高解像度対応）
     async requestCameraPermission() {
         try {
             const constraints = { 
                 video: { 
                     facingMode: 'environment',
-                    width: { ideal: 640, max: 640 },
-                    height: { ideal: 480, max: 480 }
+                    width: { ideal: 1280, max: 1920 },
+                    height: { ideal: 720, max: 1080 }
                 } 
             };
             
-            // iOS Safari の場合、より制限的な設定
+            // iOS Safari の場合の最適化
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
             if (isIOS) {
                 constraints.video = {
                     facingMode: 'environment',
-                    width: { exact: 640 },
-                    height: { exact: 480 }
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 };
             }
             
@@ -313,13 +95,6 @@ class ARApp {
                         scene.canvas.style.width = '100vw';
                         scene.canvas.style.height = '100vh';
                     }
-                    
-                    if (this.model) {
-                        // 向き変更後にモデルをリセット
-                        this.model.setAttribute('position', '0 0.5 0');
-                        this.model.setAttribute('scale', '2 2 2');
-                        this.model.setAttribute('rotation', '0 0 180');
-                    }
                 }, 500);
             });
             
@@ -352,11 +127,13 @@ class ARApp {
     // マーカー検出時の処理
     onMarkerFound() {
         // 将来的なアニメーション制御などに使用
+        console.log('3Dモデルを表示中');
     }
     
     // マーカー消失時の処理
     onMarkerLost() {
         // 将来的なクリーンアップ処理などに使用
+        console.log('3Dモデルを非表示');
     }
     
     // エラーハンドリング

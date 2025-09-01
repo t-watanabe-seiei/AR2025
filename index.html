@@ -34,8 +34,7 @@
         <div class="instruction-content">
             <h3>使用方法</h3>
             <p>HIROマーカーをカメラに向けてください</p>
-            <p>📱 モデルを指でドラッグして回転</p>
-            <p>🤏 二本指でピンチしてサイズ変更</p>
+            <p>📱 3Dモデルが表示されます</p>
             <button onclick="hideInstructions()">開始</button>
         </div>
     </div>
@@ -43,7 +42,7 @@
     <!-- メインARシーン -->
     <a-scene
         embedded
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480; canvasWidth: 640; canvasHeight: 480;"
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; canvasWidth: 1280; canvasHeight: 720;"
         vr-mode-ui="enabled: false"
         renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true; antialias: true; alpha: true;"
         loading-screen="enabled: false"
@@ -57,17 +56,14 @@
         <!-- HIROマーカー -->
         <a-marker 
             preset="hiro" 
-            id="hiromMarker"
-            raycaster="objects: .interactive">
+            id="hiromMarker">
             <!-- 3Dモデル配置 -->
             <a-gltf-model 
                 id="interactiveModel"
-                class="interactive"
                 src="#akaeiModel"
                 position="0 0.5 0"
                 scale="2 2 2"
                 rotation="0 0 180"
-                touch-controls
                 shadow="cast: true; receive: true">
             </a-gltf-model>
         </a-marker>
