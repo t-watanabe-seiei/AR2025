@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR体験アプリ</title>
+    
+    <!-- A-Frame + AR.js CDN -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ローディング画面 -->
+    <div id="loadingScreen">
+        <div class="loading-content">
+            <h2>AR体験の準備中...</h2>
+            <div class="spinner"></div>
+        </div>
+    </div>
+    
+    <!-- エラーメッセージ -->
+    <div id="errorScreen" class="hidden">
+        <div class="error-content">
+            <h2>エラーが発生しました</h2>
+            <p id="errorMessage"></p>
+            <button onclick="retryCamera()">再試行</button>
+        </div>
+    </div>
+    
+    <!-- 使用方法案内 -->
+    <div id="instructionOverlay" class="hidden">
+        <div class="instruction-content">
+            <h3>使用方法</h3>
+            <p>HIROマーカーをカメラに向けてください</p>
+            <button onclick="hideInstructions()">開始</button>
+        </div>
+    </div>
+    
+    <!-- メインARシーン -->
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true;"
+        loading-screen="enabled: false">
+        
+        <!-- アセット管理 -->
+        <a-assets>
+            <a-asset-item id="duckModel" src="assets/models/duck.gltf"></a-asset-item>
+        </a-assets>
+        
+        <!-- HIROマーカー -->
+        <a-marker preset="hiro" id="hiromMarker">
+            <!-- 3Dモデル配置 -->
+            <a-gltf-model 
+                src="#duckModel"
+                position="0 0 0"
+                scale="0.5 0.5 0.5"
+                rotation="0 0 0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+            </a-gltf-model>
+        </a-marker>
+        
+        <!-- カメラ設定 -->
+        <a-entity camera></a-entity>
+    </a-scene>
+    
+    <script src="script.js"></script>
+</body>
+</html>
