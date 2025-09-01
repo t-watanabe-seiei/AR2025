@@ -34,6 +34,8 @@
         <div class="instruction-content">
             <h3>使用方法</h3>
             <p>HIROマーカーをカメラに向けてください</p>
+            <p>📱 モデルを指でドラッグして回転</p>
+            <p>🤏 二本指でピンチしてサイズ変更</p>
             <button onclick="hideInstructions()">開始</button>
         </div>
     </div>
@@ -61,10 +63,12 @@
             smoothThreshold="5">
             <!-- 3Dモデル配置 -->
             <a-gltf-model 
+                id="interactiveModel"
                 src="#akaeiModel"
                 position="0 0 0"
                 scale="3 3 3"
-                rotation="0 0 0">
+                rotation="0 0 0"
+                touch-controls>
             </a-gltf-model>
         </a-marker>
         
