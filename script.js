@@ -255,13 +255,25 @@ class ARApp {
     // カメラ権限要求
     async requestCameraPermission() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
+            const constraints = { 
                 video: { 
                     facingMode: 'environment',
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
+                    width: { ideal: 640, max: 640 },
+                    height: { ideal: 480, max: 480 }
                 } 
-            });
+            };
+            
+            // iOS Safari の場合、より制限的な設定
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (isIOS) {
+                constraints.video = {
+                    facingMode: 'environment',
+                    width: { exact: 640 },
+                    height: { exact: 480 }
+                };
+            }
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             stream.getTracks().forEach(track => track.stop());
             return true;
         } catch (error) {
@@ -293,11 +305,32 @@ class ARApp {
             // デバイス方向の変更監視
             window.addEventListener('orientationchange', () => {
                 setTimeout(() => {
+                    // iOS Safari でのレイアウト修正
+                    const scene = document.querySelector('a-scene');
+                    if (scene && scene.canvas) {
+                        scene.canvas.style.width = '100vw';
+                        scene.canvas.style.height = '100vh';
+                    }
+                    
                     if (this.model) {
                         // 向き変更後にモデルをリセット
-                        this.model.setAttribute('position', '0 0 0');
+                        this.model.setAttribute('position', '0 0.5 0');
+                        this.model.setAttribute('scale', '2 2 2');
+                        this.model.setAttribute('rotation', '0 0 180');
                     }
                 }, 500);
+            });
+            
+            // iOS Safari での viewport 高さ問題の対応
+            const setViewportHeight = () => {
+                const vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+            };
+            
+            setViewportHeight();
+            window.addEventListener('resize', setViewportHeight);
+            window.addEventListener('orientationchange', () => {
+                setTimeout(setViewportHeight, 500);
             });
         }, 1000);
     }
