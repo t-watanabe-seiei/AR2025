@@ -163,7 +163,7 @@
           }
           
           // 視覚的フィードバック（黄色で強調）
-          this.el.setAttribute('material', 'opacity: 0.7; color: #ffff00; emissive: #444400');
+          this.el.setAttribute('material', 'opacity: 0.0; color: #ffff00; emissive: #444400');
         },
 
         onIntersectedCleared: function (evt) {
@@ -176,7 +176,7 @@
             this.isIntersected = false;
             this.isHovered = false;
             // 元の状態に戻す
-            this.el.setAttribute('material', 'opacity: 0.2; color: #ffffff; emissive: #000000');
+            this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
           }, 50);
         },
 
@@ -189,7 +189,7 @@
             this.hoverTimeout = null;
           }
           
-          this.el.setAttribute('material', 'opacity: 0.8; color: #00ff00; emissive: #004400');
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #004400');
         },
 
         onCursorLeave: function (evt) {
@@ -198,7 +198,7 @@
           this.hoverTimeout = setTimeout(() => {
             this.isHovered = false;
             if (!this.isIntersected) {
-              this.el.setAttribute('material', 'opacity: 0.2; color: #ffffff; emissive: #000000');
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
             }
           }, 50);
         },
@@ -212,7 +212,7 @@
             this.hoverTimeout = null;
           }
           
-          this.el.setAttribute('material', 'opacity: 0.6; color: #00ff00; emissive: #002200');
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #002200');
         },
 
         onHoverEnd: function (evt) {
@@ -221,7 +221,7 @@
           this.hoverTimeout = setTimeout(() => {
             this.isHovered = false;
             if (!this.isIntersected) {
-              this.el.setAttribute('material', 'opacity: 0.2; color: #ffffff; emissive: #000000');
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
             }
           }, 50);
         },
@@ -426,7 +426,7 @@
             clickable
             scale="2 2 2"
             position="0 0 0"
-            material="opacity: 0.2; transparent: true; color: #ffffff; side: double"
+            material="opacity: 0.0; transparent: true; color: #ffffff; side: double"
             geometry="primitive: box"
             class="clickable"
             raycaster-listen>
