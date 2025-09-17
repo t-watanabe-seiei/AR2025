@@ -126,7 +126,19 @@
           this.el.addEventListener('mouseover', this.onHover.bind(this));
           this.el.addEventListener('mouseout', this.onHoverEnd.bind(this));
           
-          // クリックイベント
+          // クリックイベント（複数追加で確実性向上）
+          this.el.addEventListener('click', this.onClick.bind(this));
+          this.el.addEventListener('mousedown', this.onClick.bind(this));
+          this.el.addEventListener('mouseup', this.onClick.bind(this));
+          this.el.addEventListener('touchstart', this.onClick.bind(this));
+          this.el.addEventListener('touchend', this.onClick.bind(this));
+          
+          // 強制的にクリック可能にする設定
+          this.el.setAttribute('cursor-listener', '');
+          this.el.object3D.userData.clickable = true;
+          
+          // 連続的なマウス位置監視を設定
+          this.setupContinuousMonitoring();
           this.el.addEventListener('mousedown', this.onClick.bind(this));
           this.el.addEventListener('touchstart', this.onClick.bind(this));
           this.el.addEventListener('click', this.onClick.bind(this));
@@ -379,7 +391,7 @@
         }
       });
     </script>
-    <title>**22 hiro***</title>
+    <title>**23 hiro***</title>
   </head>
   <body style="margin: 0; overflow: hidden">
     
@@ -392,7 +404,7 @@
     <a-scene embedded arjs vr-mode-ui="enabled: false;" 
       renderer="logarithmicDepthBuffer: true; colorManagement: true; physicallyCorrectLights: true; exposure: 1.2;"
       cursor="rayOrigin: mouse; fuseTimeout: 0" 
-      raycaster="objects: .clickable; far: 1000; near: 0.1; interval: 50">
+      raycaster="objects: .clickable; far: 1000; near: 0.01; interval: 16; autoRefresh: true; recursive: true">
 	    
       <!-- 3DCGモデルを読み込む -->
       <a-assets>
@@ -424,20 +436,37 @@
           <!-- クリック判定用の透明なボックス（当たり判定） -->
           <a-box
             clickable
+            scale="3 3 3"
+            position="0 0 0"
+            material="opacity: 0.0; transparent: true; color: #ffffff; side: double; alphaTest: 0"
+            geometry="primitive: box; width: 1; height: 1; depth: 1"
+            class="clickable"
+            raycaster-listen
+            cursor-listener
+            visible="true">
+          </a-box>
+          
+          <!-- 追加のクリック判定用スフィア（球体） -->
+          <a-sphere
+            clickable
             scale="2 2 2"
             position="0 0 0"
-            material="opacity: 0.2; transparent: true; color: #ffffff; side: double"
-            geometry="primitive: box"
+            material="opacity: 0.0; transparent: true; color: #ffffff; side: double; alphaTest: 0"
+            geometry="primitive: sphere; radius: 1"
             class="clickable"
-            raycaster-listen>
-          </a-box>
+            raycaster-listen
+            cursor-listener
+            visible="true">
+          </a-sphere>
         </a-entity>
       </a-marker>
 
       <!-- カメラを追加（raycasterとcursor付き） -->
       <a-entity camera
-        raycaster="objects: .clickable; far: 1000; near: 0.1; showLine: false; interval: 50; lineColor: red; lineOpacity: 0.5"
-        cursor="rayOrigin: mouse; fuseTimeout: 0; downEvents: mousedown,touchstart; upEvents: mouseup,touchend">
+        raycaster="objects: .clickable; far: 1000; near: 0.01; showLine: false; interval: 16; autoRefresh: true; recursive: true; lineColor: red; lineOpacity: 0.5"
+        cursor="rayOrigin: mouse; fuseTimeout: 0; downEvents: mousedown,touchstart; upEvents: mouseup,touchend"
+        look-controls="enabled: false"
+        wasd-controls="enabled: false">
       </a-entity>
     </a-scene>
   </body>
