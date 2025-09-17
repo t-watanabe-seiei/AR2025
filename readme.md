@@ -27,12 +27,8 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
 - WebGL対応ブラウザ
 - HTTPS接続（本番環境）
 
-## 2025年9月19日 index.html のコード
-
-### 1. プロジェクトのクローン
+## 2025年9月19日 index.html のコードのクローン
 ```bash
-<!-- マーカーを読み込んで３Ｄモデルを表示 + アニメーション再生(anime01 → anime02 → anime03 → anime04)  -->
-
 <!DOCTYPE html>
 <html lang="ja">
   <head>
