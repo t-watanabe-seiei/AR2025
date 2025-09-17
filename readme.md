@@ -27,105 +27,503 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
 - WebGL対応ブラウザ
 - HTTPS接続（本番環境）
 
-## セットアップ
+## 2025年9月19日 index.html のコード
 
 ### 1. プロジェクトのクローン
 ```bash
-git clone <repository-url>
-cd AR2025
+<!-- マーカーを読み込んで３Ｄモデルを表示 + アニメーション再生(anime01 → anime02 → anime03 → anime04)  -->
+
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- A-Frame を読み込む -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- AR.js を読み込む -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- Gesture Handler を読み込む -->
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+    <!-- Animation Mixer を読み込む -->
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script>
+      // モデルの状態を管理するコンポーネント
+      AFRAME.registerComponent('model-controller', {
+        schema: {
+          // 初期位置
+          initialPosition: { type: 'vec3', default: { x: 0, y: 0, z: 0 } },
+          // 移動後の位置
+          moveToPosition: { type: 'vec3', default: { x: 5, y: 0, z: 0 } }
+        },
+
+        init: function () {
+          // モデルの初期状態を設定
+          this.el.setAttribute('position', this.data.initialPosition);
+          
+          // アニメーション状態を初期化
+          this.isAnimating = false;
+          this.currentState = 'initial'; // 'initial' or 'moved'
+
+          // モデルが読み込まれた時の処理
+          this.el.addEventListener('model-loaded', () => {
+            // 初期アニメーション（anime01のループ）を開始
+            this.playAnimation('anime01', true);
+          });
+        },
+
+        // アニメーション再生関数
+        playAnimation: function (clipName, loop = false) {
+          if (this.isAnimating) return;
+          
+          this.el.setAttribute('animation-mixer', {
+            clip: clipName,
+            loop: loop ? 'repeat' : 'once',
+            clampWhenFinished: !loop,
+            timeScale: 1
+          });
+
+          // ループしないアニメーションの場合、完了イベントを監視
+          if (!loop) {
+            const mixer = this.el.components['animation-mixer'].mixer;
+            if (mixer) {
+              this.isAnimating = true;
+              const onFinished = () => {
+                mixer.removeEventListener('finished', onFinished);
+                this.isAnimating = false;
+                // アニメーション完了後の処理をここで行う
+                this.onAnimationComplete(clipName);
+              };
+              mixer.addEventListener('finished', onFinished);
+            }
+          }
+        },
+
+        // アニメーション完了時の処理
+        onAnimationComplete: function (completedClip) {
+          if (completedClip === 'anime02') {
+            // anime02完了後、anime03をループ再生しながら移動
+            this.playAnimation('anime03', true);
+            this.moveModel();
+          }
+        },
+
+        // モデルを新しい位置に移動
+        moveModel: function () {
+          this.el.setAttribute('animation__position', {
+            property: 'position',
+            to: this.data.moveToPosition,
+            dur: 3000, // 3秒かけて移動
+            easing: 'easeInOutQuad'
+          });
+
+          // 移動完了後の処理
+          this.el.addEventListener('animationcomplete__position', () => {
+            if (this.currentState === 'initial') {
+              this.currentState = 'moved';
+              // 移動完了後、anime01のループ再生に戻る
+              this.playAnimation('anime01', true);
+            }
+          }, { once: true });
+        }
+      });
+
+      // クリック検知用の当たり判定コンポーネント
+      AFRAME.registerComponent('clickable', {
+        init: function () {
+          console.log('Clickable component initialized');
+          
+          // 状態管理
+          this.isIntersected = false;
+          this.isHovered = false;
+          this.hoverTimeout = null;
+          this.isSoundPlaying = false; // サウンド再生状態を管理
+          this.clickCount = 0; // クリック回数を管理
+          this.lastClickTime = 0; // ダブルクリック検知用
+          
+          // クリック回数表示を初期化
+          this.updateClickDisplay();
+          
+          // ARでのクリック検知のため、raycasterとcursorを使用
+          this.el.setAttribute('cursor-listener', '');
+          
+          // 複数のイベントタイプを設定（優先度順）
+          this.el.addEventListener('raycaster-intersected', this.onIntersected.bind(this));
+          this.el.addEventListener('raycaster-intersected-cleared', this.onIntersectedCleared.bind(this));
+          
+          // A-Frame cursor イベント（高精度）
+          this.el.addEventListener('mouseenter', this.onCursorEnter.bind(this));
+          this.el.addEventListener('mouseleave', this.onCursorLeave.bind(this));
+          
+          // 従来のマウスイベント（フォールバック）
+          this.el.addEventListener('mouseover', this.onHover.bind(this));
+          this.el.addEventListener('mouseout', this.onHoverEnd.bind(this));
+          
+          // クリックイベント
+          this.el.addEventListener('mousedown', this.onClick.bind(this));
+          this.el.addEventListener('touchstart', this.onClick.bind(this));
+          this.el.addEventListener('click', this.onClick.bind(this));
+          
+          // 連続的なマウス移動監視
+          this.setupContinuousMonitoring();
+        },
+
+        setupContinuousMonitoring: function () {
+          // マウス位置の連続監視
+          this.mouseMonitorInterval = setInterval(() => {
+            const raycaster = this.el.sceneEl.systems.raycaster;
+            if (raycaster && raycaster.raycaster) {
+              const intersections = raycaster.raycaster.intersectObject(this.el.object3D, true);
+              if (intersections.length > 0 && !this.isIntersected) {
+                this.onIntersected();
+              } else if (intersections.length === 0 && this.isIntersected) {
+                this.onIntersectedCleared();
+              }
+            }
+          }, 100); // 100msごとにチェック
+        },
+
+        onIntersected: function (evt) {
+          if (this.isIntersected) return; // 重複防止
+          
+          console.log('Raycaster intersected - HIGH PRECISION');
+          this.isIntersected = true;
+          
+          // 遅延をクリアして即座に反応
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          // 視覚的フィードバック（黄色で強調）
+          this.el.setAttribute('material', 'opacity: 0.0; color: #ffff00; emissive: #444400');
+        },
+
+        onIntersectedCleared: function (evt) {
+          if (!this.isIntersected) return; // 重複防止
+          
+          console.log('Raycaster intersection cleared');
+          
+          // 少し遅延させてちらつきを防止
+          this.hoverTimeout = setTimeout(() => {
+            this.isIntersected = false;
+            this.isHovered = false;
+            // 元の状態に戻す
+            this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+          }, 50);
+        },
+
+        onCursorEnter: function (evt) {
+          console.log('Cursor entered - CURSOR EVENT');
+          this.isHovered = true;
+          
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #004400');
+        },
+
+        onCursorLeave: function (evt) {
+          console.log('Cursor left - CURSOR EVENT');
+          
+          this.hoverTimeout = setTimeout(() => {
+            this.isHovered = false;
+            if (!this.isIntersected) {
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+            }
+          }, 50);
+        },
+
+        onHover: function (evt) {
+          console.log('Mouse hover detected - MOUSE EVENT');
+          this.isHovered = true;
+          
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #002200');
+        },
+
+        onHoverEnd: function (evt) {
+          console.log('Mouse hover ended - MOUSE EVENT');
+          
+          this.hoverTimeout = setTimeout(() => {
+            this.isHovered = false;
+            if (!this.isIntersected) {
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+            }
+          }, 50);
+        },
+
+        onClick: function (evt) {
+          console.log('Click detected on clickable object', evt.type);
+          evt.preventDefault();
+          evt.stopPropagation();
+          
+          // マーカー検出時のみクリック有効
+          const marker = document.querySelector('#marker-hiro');
+          if (!marker || !marker.object3D.visible) {
+            console.log('Marker not detected - click ignored');
+            return;
+          }
+          
+          // サウンド再生中はクリックを無効にする
+          if (this.isSoundPlaying) {
+            console.log('Sound is playing - click ignored');
+            return;
+          }
+          
+          // ダブルクリック検知（500ms以内の連続クリック）
+          const currentTime = Date.now();
+          if (currentTime - this.lastClickTime < 500) {
+            // ダブルクリック - カウンターをリセット
+            this.clickCount = 0;
+            this.updateClickDisplay();
+            console.log('Double click detected - counter reset');
+            this.showCelebrationMessage('🔄 カウンターリセット！');
+            this.lastClickTime = 0;
+            return;
+          }
+          this.lastClickTime = currentTime;
+          
+          // クリック回数を増加
+          this.clickCount++;
+          this.updateClickDisplay();
+          console.log('Click count:', this.clickCount);
+          
+          // クリックするたびにサウンドを再生
+          this.playClickSound();
+          
+          // 親要素（モデル本体）のコントローラーを取得
+          const modelController = this.el.parentNode.components['model-controller'];
+          if (modelController && modelController.currentState === 'initial') {
+            console.log('Triggering anime02 animation');
+            // anime02を1回再生
+            modelController.playAnimation('anime02', false);
+          } else {
+            console.log('Model controller not available or not in initial state - but sound still plays');
+          }
+        },
+
+        // クリック回数表示を更新する関数
+        updateClickDisplay: function () {
+          const clickCountElement = document.getElementById('click-count');
+          if (clickCountElement) {
+            clickCountElement.textContent = this.clickCount;
+            
+            // クリック時にアニメーション効果を追加
+            if (this.clickCount > 0) {
+              clickCountElement.style.transform = 'scale(1.2)';
+              clickCountElement.style.color = '#ffff00';
+              setTimeout(() => {
+                clickCountElement.style.transform = 'scale(1)';
+                clickCountElement.style.color = 'white';
+              }, 200);
+            }
+            
+            // 特定の回数でお祝いメッセージ
+            if (this.clickCount === 10) {
+              this.showCelebrationMessage('🎉 10回達成！');
+            } else if (this.clickCount === 50) {
+              this.showCelebrationMessage('🌟 50回達成！すごい！');
+            } else if (this.clickCount === 100) {
+              this.showCelebrationMessage('🏆 100回達成！素晴らしい！');
+            }
+          } else {
+            console.warn('Click count display element not found');
+          }
+        },
+
+        // お祝いメッセージを表示する関数
+        showCelebrationMessage: function (message) {
+          const counterDiv = document.getElementById('click-counter');
+          if (counterDiv) {
+            // 一時的にメッセージを表示
+            const originalText = counterDiv.innerHTML;
+            counterDiv.innerHTML = `<div style="color: #ffff00; font-size: 20px;">${message}</div>`;
+            counterDiv.style.background = 'rgba(255,215,0,0.9)';
+            counterDiv.style.color = 'black';
+            
+            setTimeout(() => {
+              counterDiv.innerHTML = originalText;
+              counterDiv.style.background = 'rgba(0,0,0,0.7)';
+              counterDiv.style.color = 'white';
+            }, 2000);
+          }
+        },
+
+        // クリック時のサウンド再生関数
+        playClickSound: function () {
+          try {
+            const soundElement = document.getElementById('sound01');
+            if (soundElement) {
+              // サウンド再生状態をtrueに設定
+              this.isSoundPlaying = true;
+              
+              // 既に再生中の場合は停止してから再生
+              soundElement.currentTime = 0;
+              const playPromise = soundElement.play();
+              
+              // サウンド終了イベントを監視
+              soundElement.addEventListener('ended', () => {
+                this.isSoundPlaying = false;
+                console.log('Sound playback finished - clicks enabled');
+              }, { once: true });
+              
+              // エラー時もサウンド状態をリセット
+              soundElement.addEventListener('error', () => {
+                this.isSoundPlaying = false;
+                console.log('Sound playback error - clicks enabled');
+              }, { once: true });
+              
+              if (playPromise !== undefined) {
+                playPromise.then(() => {
+                  console.log('Click sound started successfully - clicks disabled during playback');
+                }).catch(error => {
+                  console.warn('Click sound playback failed:', error);
+                  this.isSoundPlaying = false; // エラー時は状態をリセット
+                });
+              }
+            } else {
+              console.warn('Sound01 element not found');
+              this.isSoundPlaying = false;
+            }
+          } catch (error) {
+            console.error('Error playing click sound:', error);
+            this.isSoundPlaying = false; // エラー時は状態をリセット
+          }
+        },
+
+        remove: function () {
+          // クリーンアップ
+          if (this.mouseMonitorInterval) {
+            clearInterval(this.mouseMonitorInterval);
+          }
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+          }
+          
+          // サウンド状態をリセット
+          this.isSoundPlaying = false;
+          
+          // サウンド要素の停止
+          const soundElement = document.getElementById('sound01');
+          if (soundElement) {
+            soundElement.pause();
+            soundElement.currentTime = 0;
+          }
+        }
+      });
+      
+      // マーカー検出状況を監視
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('Setting up marker detection monitoring...');
+        
+        // A-Sceneが準備完了したら監視開始
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+          scene.addEventListener('loaded', function() {
+            console.log('A-Scene loaded, setting up marker listeners...');
+            
+            const marker = document.querySelector('#marker-hiro');
+            if (marker) {
+              // マーカー検出イベント
+              marker.addEventListener('markerFound', function() {
+                console.log('✅ HIRO marker found - 3D model should be visible');
+              });
+              
+              // マーカー喪失イベント
+              marker.addEventListener('markerLost', function() {
+                console.log('❌ HIRO marker lost - 3D model should be hidden');
+              });
+              
+              console.log('Marker event listeners set up successfully');
+            } else {
+              console.warn('Marker element not found');
+            }
+          });
+        }
+      });
+    </script>
+    <title>**20250919***</title>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    
+    <!-- クリック回数表示 -->
+    <div id="click-counter" style="position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; border-radius: 10px; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; z-index: 1000;">
+      クリック回数: <span id="click-count">0</span>
+    </div>
+	  
+    <!-- A-FrameにAR.jsを紐づけ、VRボタン非表示、深度バッファ追加 -->
+    <a-scene embedded arjs vr-mode-ui="enabled: false;" 
+      renderer="logarithmicDepthBuffer: true; colorManagement: true; physicallyCorrectLights: true; exposure: 1.2;"
+      cursor="rayOrigin: mouse; fuseTimeout: 0" 
+      raycaster="objects: .clickable; far: 1000; near: 0.01; interval: 15">
+	    
+      <!-- 3DCGモデルを読み込む -->
+      <a-assets>
+        <a-asset-item id="neko" src="./asset/3Dmodel.glb"></a-asset-item>
+        <audio id="sound01" src="./asset/sound01.mp3" preload="auto"></audio>
+      </a-assets>
+
+      <!-- ライティング設定 -->
+      <a-entity light="type: ambient; intensity: 1.5; color: #ffffff"></a-entity>
+      <a-entity light="type: directional; intensity: 1.2; color: #ffffff" position="-1 1 0.5"></a-entity>
+      <a-entity light="type: hemisphere; intensity: 0.8; color: #ffffff; groundColor: #888888"></a-entity>
+
+      <!-- HIROマーカーを使用 -->
+      <!-- <a-marker preset="hiro" id="marker-hiro" emitevents="true" cursor="rayOrigin: mouse"> -->
+            <!-- マーカーの.pattファイルを読み込む -->
+      <a-marker type="pattern" url="./asset/pattern-marker.patt" id="marker-hiro" emitevents="true" cursor="rayOrigin: mouse">
+        
+        <!-- モデルのコンテナ（アニメーションと移動の制御用） -->
+        <a-entity
+          id="model-container"
+          model-controller
+          gesture-handler="minScale: 0.25; maxScale: 10"
+          animation-mixer
+          visible="true">
+          
+          <!-- 3Dモデル本体 -->
+          <a-entity
+            gltf-model="#neko"
+            scale="1.5 1.5 1.5"
+            position="0 0 0"
+            rotation="0 0 0"
+            visible="true">
+          </a-entity>
+
+          <!-- クリック判定用の透明なボックス（当たり判定） -->
+          <a-box
+            clickable
+            scale="2.5 2.5 2.5"
+            position="0 0 0"
+            material="opacity: 0.0; transparent: true; color: #ffffff; side: double"
+            geometry="primitive: box"
+            class="clickable"
+            raycaster-listen>
+          </a-box>
+        </a-entity>
+      </a-marker>
+
+      <!-- カメラを追加（raycasterとcursor付き） -->
+      <a-entity camera
+        raycaster="objects: .clickable; far: 1000; near: 0.1; showLine: false; interval: 50; lineColor: red; lineOpacity: 0.5"
+        cursor="rayOrigin: mouse; fuseTimeout: 0; downEvents: mousedown,touchstart; upEvents: mouseup,touchend">
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
 ```
 
 ### 2. ローカルサーバー起動
 ```bash
-# Node.js live-server使用
-npx live-server --port=8000
-
-# または Python使用
-python -m http.server 8000
+http-server
 ```
-
-### 3. ブラウザでアクセス
-```
-http://localhost:8000
-```
-
-## 使用方法
-
-### 1. カメラアクセス許可
-- ブラウザがカメラアクセスを要求します
-- 「許可」をクリックしてください
-
-### 2. HIROマーカーの準備
-- [HIROマーカー](https://github.com/AR-js-org/AR.js/blob/master/data/images/hiro.png)をダウンロード
-- A4サイズで印刷（推奨サイズ: 5cm以上）
-- 平らな面に配置
-
-### 3. AR体験開始
-- マーカーをカメラに向ける
-- 3Dモデルが表示されます
-- マーカーを動かすとモデルも追従します
-
-## ファイル構成
-
-```
-AR2025/
-├── index.html              # メインHTMLファイル
-├── style.css               # スタイルシート
-├── script.js               # JavaScript（AR制御）
-├── assets/
-│   ├── models/
-│   │   └── duck.gltf       # 3Dモデル
-│   ├── markers/
-│   │   └── README.md       # マーカー説明
-│   └── textures/           # テクスチャ（拡張用）
-├── .claude_workflow/       # 開発管理ファイル
-└── README.md               # このファイル
-```
-
-## 技術仕様
-
-### 使用ライブラリ
-- **A-Frame**: 1.4.0+ (WebVRフレームワーク)
-- **AR.js**: 3.4.0+ (AR機能)
-- **Three.js**: A-Frameに内包
-
-### パフォーマンス目標
-- フレームレート: 30fps以上
-- 初期読み込み: 5秒以内
-- メモリ使用量: 100MB以下
-
-## トラブルシューティング
-
-### カメラが認識されない
-- ブラウザの設定でカメラアクセスを確認
-- HTTPS接続で試行
-- 他のアプリがカメラを使用していないか確認
-
-### マーカーが検出されない
-- 十分な明るさの環境で使用
-- マーカーが平らで鮮明に印刷されているか確認
-- マーカーサイズを大きくしてみる
-
-### 3Dモデルが表示されない
-- ブラウザ開発者ツールでエラーを確認
-- ネットワーク接続を確認
-- ブラウザのWebGL対応を確認
-
-### パフォーマンスが悪い
-- 他のアプリを終了
-- ブラウザを再起動
-- より高性能なデバイスを使用
-
-## 開発情報
-
-### カスタマイズ
-- `assets/models/`に新しい3Dモデルを追加可能
-- `script.js`でアニメーションやインタラクションを追加
-- `style.css`でUIデザインをカスタマイズ
-
-### デプロイ
-- GitHub Pages、Netlify、Vercel対応
-- HTTPS必須（カメラアクセスのため）
 
 ## ライセンス
 

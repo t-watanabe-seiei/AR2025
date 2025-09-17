@@ -231,6 +231,13 @@
           evt.preventDefault();
           evt.stopPropagation();
           
+          // マーカー検出時のみクリック有効
+          const marker = document.querySelector('#marker-hiro');
+          if (!marker || !marker.object3D.visible) {
+            console.log('Marker not detected - click ignored');
+            return;
+          }
+          
           // サウンド再生中はクリックを無効にする
           if (this.isSoundPlaying) {
             console.log('Sound is playing - click ignored');
@@ -378,8 +385,38 @@
           }
         }
       });
+      
+      // マーカー検出状況を監視
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('Setting up marker detection monitoring...');
+        
+        // A-Sceneが準備完了したら監視開始
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+          scene.addEventListener('loaded', function() {
+            console.log('A-Scene loaded, setting up marker listeners...');
+            
+            const marker = document.querySelector('#marker-hiro');
+            if (marker) {
+              // マーカー検出イベント
+              marker.addEventListener('markerFound', function() {
+                console.log('✅ HIRO marker found - 3D model should be visible');
+              });
+              
+              // マーカー喪失イベント
+              marker.addEventListener('markerLost', function() {
+                console.log('❌ HIRO marker lost - 3D model should be hidden');
+              });
+              
+              console.log('Marker event listeners set up successfully');
+            } else {
+              console.warn('Marker element not found');
+            }
+          });
+        }
+      });
     </script>
-    <title>**28hiro***</title>
+    <title>**20250919***</title>
   </head>
   <body style="margin: 0; overflow: hidden">
     
@@ -406,29 +443,31 @@
       <a-entity light="type: hemisphere; intensity: 0.8; color: #ffffff; groundColor: #888888"></a-entity>
 
       <!-- HIROマーカーを使用 -->
-      <!-- <a-marker preset="hiro"> -->
-      
-      <!-- パターンマーカーを使用 -->
-      <a-marker type="pattern" url="./asset/pattern-marker.patt"></a-marker>
+      <!-- <a-marker preset="hiro" id="marker-hiro" emitevents="true" cursor="rayOrigin: mouse"> -->
+            <!-- マーカーの.pattファイルを読み込む -->
+      <a-marker type="pattern" url="./asset/pattern-marker.patt" id="marker-hiro" emitevents="true" cursor="rayOrigin: mouse">
         
         <!-- モデルのコンテナ（アニメーションと移動の制御用） -->
         <a-entity
           id="model-container"
           model-controller
           gesture-handler="minScale: 0.25; maxScale: 10"
-          animation-mixer>
+          animation-mixer
+          visible="true">
           
           <!-- 3Dモデル本体 -->
           <a-entity
             gltf-model="#neko"
-            scale="2 2 2"
-            rotation="0 0 0">
+            scale="1.5 1.5 1.5"
+            position="0 0 0"
+            rotation="0 0 0"
+            visible="true">
           </a-entity>
 
           <!-- クリック判定用の透明なボックス（当たり判定） -->
           <a-box
             clickable
-            scale="3 3 3"
+            scale="2.5 2.5 2.5"
             position="0 0 0"
             material="opacity: 0.0; transparent: true; color: #ffffff; side: double"
             geometry="primitive: box"
