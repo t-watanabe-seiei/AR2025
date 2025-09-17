@@ -7,11 +7,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />
     <!-- A-Frame を読み込む -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- AR.js を読み込む -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <!-- AR.js を読み込み（安定版を使用） -->
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@2.2.2/aframe/build/aframe-ar.min.js"></script>
     <!-- Gesture Handler を読み込む -->
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@2.2.2/three.js/build/ar-threex-location-only.js"></script>
     <!-- Animation Mixer を読み込む -->
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
     <script>
@@ -430,7 +430,7 @@
     </div>
 	  
     <!-- A-FrameにAR.jsを紐づけ、VRボタン非表示、深度バッファ追加 -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480; cameraParametersUrl: ''; videoTexture: true; trackingMethod: best; smooth: true; smoothCount: 5; smoothTolerance: 0.01; smoothThreshold: 2;" 
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;" 
       vr-mode-ui="enabled: false;" 
       renderer="logarithmicDepthBuffer: true; colorManagement: true; physicallyCorrectLights: true; exposure: 1.2;"
       cursor="rayOrigin: mouse; fuseTimeout: 0" 
@@ -453,7 +453,6 @@
         <a-entity
           id="model-container"
           model-controller
-          gesture-handler="minScale: 0.25; maxScale: 10"
           animation-mixer>
           
           <!-- 3Dモデル本体 -->
