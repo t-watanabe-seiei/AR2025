@@ -379,7 +379,7 @@
         }
       });
     </script>
-    <title>**27hiro***</title>
+    <title>**28hiro***</title>
   </head>
   <body style="margin: 0; overflow: hidden">
     
@@ -396,8 +396,8 @@
 	    
       <!-- 3DCGモデルを読み込む -->
       <a-assets>
-        <a-asset-item id="neko" src="./assets/3Dmodel.glb"></a-asset-item>
-        <audio id="sound01" src="./assets/sound01.mp3" preload="auto"></audio>
+        <a-asset-item id="neko" src="./asset/3Dmodel.glb"></a-asset-item>
+        <audio id="sound01" src="./asset/sound01.mp3" preload="auto"></audio>
       </a-assets>
 
       <!-- ライティング設定 -->
@@ -406,7 +406,11 @@
       <a-entity light="type: hemisphere; intensity: 0.8; color: #ffffff; groundColor: #888888"></a-entity>
 
       <!-- HIROマーカーを使用 -->
-      <a-marker preset="hiro">
+      <!-- <a-marker preset="hiro"> -->
+      
+      <!-- パターンマーカーを使用 -->
+      <a-marker type="pattern" url="./asset/pattern-marker.patt"></a-marker>
+        
         <!-- モデルのコンテナ（アニメーションと移動の制御用） -->
         <a-entity
           id="model-container"
