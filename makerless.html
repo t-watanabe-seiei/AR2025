@@ -1,0 +1,660 @@
+<!-- マーカーレスAR実装 -->
+
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- A-Frame を読み込む -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- AR.js NFT版を読み込む -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <!-- Animation Mixer を読み込む -->
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script>
+      // マーカーハンドリング用のコンポーネントを定義
+      AFRAME.registerComponent('markerhandler', {
+        init: function () {
+          console.log('Marker handler component initialized for:', this.el);
+          
+          // NFT関連イベント
+          this.el.addEventListener('markerFound', () => {
+            console.log('⭐ Marker found via markerFound event');
+            
+            // 全てのボックスの状態を確認
+            const boxes = this.el.querySelectorAll('a-box');
+            console.log(`📦 Found ${boxes.length} boxes in NFT element`);
+            
+            boxes.forEach((box, index) => {
+              const color = box.getAttribute('color');
+              const position = box.getAttribute('position');
+              const scale = box.getAttribute('scale');
+              const visible = box.object3D ? box.object3D.visible : 'no object3D';
+              console.log(`📦 Box ${index} - Color: ${color}, Position: ${position}, Scale: ${scale}, Visible: ${visible}`);
+              
+              if (box.object3D) {
+                console.log(`📦 Box ${index} world position:`, box.object3D.getWorldPosition(new THREE.Vector3()));
+                console.log(`📦 Box ${index} world scale:`, box.object3D.getWorldScale(new THREE.Vector3()));
+              }
+            });
+            
+            // NFT要素自体の状態も確認
+            console.log('📍 NFT element world position:', this.el.object3D.getWorldPosition(new THREE.Vector3()));
+            console.log('📍 NFT element world rotation:', this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+          });
+          
+          this.el.addEventListener('markerLost', () => {
+            console.log('❌ Marker lost via markerLost event');
+          });
+          
+          // trackingFound/trackingLostイベントも監視
+          this.el.addEventListener('trackingFound', () => {
+            console.log('🎯 NFT tracking found');
+          });
+          
+          this.el.addEventListener('trackingLost', () => {
+            console.log('🔍 NFT tracking lost');
+          });
+        },
+        
+        tick: function() {
+          // 毎フレーム、NFTターゲットの可視性をチェック
+          if (this.el && this.el.object3D) {
+            const isVisible = this.el.object3D.visible;
+            const currentTime = Date.now();
+            
+            // 10秒ごとに状態をレポート
+            if (!this.lastReport || currentTime - this.lastReport > 10000) {
+              console.log(`📊 NFT Status - Visible: ${isVisible}, Matrix:`, this.el.object3D.matrixWorld.elements.slice(0,4));
+              this.lastReport = currentTime;
+            }
+          }
+        }
+      });
+
+      // モデルの状態を管理するコンポーネント
+      AFRAME.registerComponent('model-controller', {
+        schema: {
+          // 初期位置
+          initialPosition: { type: 'vec3', default: { x: 0, y: 0, z: 0 } },
+          // 移動後の位置
+          moveToPosition: { type: 'vec3', default: { x: 5, y: 0, z: 0 } }
+        },
+
+        init: function () {
+          // モデルの初期状態を設定
+          this.el.setAttribute('position', this.data.initialPosition);
+          
+          // アニメーション状態を初期化
+          this.isAnimating = false;
+          this.currentState = 'initial'; // 'initial' or 'moved'
+
+          // モデルが読み込まれた時の処理
+          this.el.addEventListener('model-loaded', () => {
+            // 初期アニメーション（anime01のループ）を開始
+            this.playAnimation('anime01', true);
+          });
+        },
+
+        // アニメーション再生関数
+        playAnimation: function (clipName, loop = false) {
+          if (this.isAnimating) return;
+          
+          this.el.setAttribute('animation-mixer', {
+            clip: clipName,
+            loop: loop ? 'repeat' : 'once',
+            clampWhenFinished: !loop,
+            timeScale: 1
+          });
+
+          // ループしないアニメーションの場合、完了イベントを監視
+          if (!loop) {
+            const mixer = this.el.components['animation-mixer'].mixer;
+            if (mixer) {
+              this.isAnimating = true;
+              const onFinished = () => {
+                mixer.removeEventListener('finished', onFinished);
+                this.isAnimating = false;
+                // アニメーション完了後の処理をここで行う
+                this.onAnimationComplete(clipName);
+              };
+              mixer.addEventListener('finished', onFinished);
+            }
+          }
+        },
+
+        // アニメーション完了時の処理
+        onAnimationComplete: function (completedClip) {
+          if (completedClip === 'anime02') {
+            // anime02完了後、anime03をループ再生しながら移動
+            this.playAnimation('anime03', true);
+            this.moveModel();
+          }
+        },
+
+        // モデルを新しい位置に移動
+        moveModel: function () {
+          this.el.setAttribute('animation__position', {
+            property: 'position',
+            to: this.data.moveToPosition,
+            dur: 3000, // 3秒かけて移動
+            easing: 'easeInOutQuad'
+          });
+
+          // 移動完了後の処理
+          this.el.addEventListener('animationcomplete__position', () => {
+            if (this.currentState === 'initial') {
+              this.currentState = 'moved';
+              // 移動完了後、anime01のループ再生に戻る
+              this.playAnimation('anime01', true);
+            }
+          }, { once: true });
+        }
+      });
+
+      // クリック検知用の当たり判定コンポーネント
+      AFRAME.registerComponent('clickable', {
+        init: function () {
+          console.log('Clickable component initialized');
+          
+          // 状態管理
+          this.isIntersected = false;
+          this.isHovered = false;
+          this.hoverTimeout = null;
+          this.isSoundPlaying = false; // サウンド再生状態を管理
+          this.clickCount = 0; // クリック回数を管理
+          this.lastClickTime = 0; // ダブルクリック検知用
+          
+          // クリック回数表示を初期化
+          this.updateClickDisplay();
+          
+          // ARでのクリック検知のため、raycasterとcursorを使用
+          this.el.setAttribute('cursor-listener', '');
+          
+          // 複数のイベントタイプを設定（優先度順）
+          this.el.addEventListener('raycaster-intersected', this.onIntersected.bind(this));
+          this.el.addEventListener('raycaster-intersected-cleared', this.onIntersectedCleared.bind(this));
+          
+          // A-Frame cursor イベント（高精度）
+          this.el.addEventListener('mouseenter', this.onCursorEnter.bind(this));
+          this.el.addEventListener('mouseleave', this.onCursorLeave.bind(this));
+          
+          // 従来のマウスイベント（フォールバック）
+          this.el.addEventListener('mouseover', this.onHover.bind(this));
+          this.el.addEventListener('mouseout', this.onHoverEnd.bind(this));
+          
+          // クリックイベント
+          this.el.addEventListener('mousedown', this.onClick.bind(this));
+          this.el.addEventListener('touchstart', this.onClick.bind(this));
+          this.el.addEventListener('click', this.onClick.bind(this));
+          
+          // 連続的なマウス移動監視
+          this.setupContinuousMonitoring();
+        },
+
+        setupContinuousMonitoring: function () {
+          // マウス位置の連続監視
+          this.mouseMonitorInterval = setInterval(() => {
+            const raycaster = this.el.sceneEl.systems.raycaster;
+            if (raycaster && raycaster.raycaster) {
+              const intersections = raycaster.raycaster.intersectObject(this.el.object3D, true);
+              if (intersections.length > 0 && !this.isIntersected) {
+                this.onIntersected();
+              } else if (intersections.length === 0 && this.isIntersected) {
+                this.onIntersectedCleared();
+              }
+            }
+          }, 100); // 100msごとにチェック
+        },
+
+        onIntersected: function (evt) {
+          if (this.isIntersected) return; // 重複防止
+          
+          console.log('Raycaster intersected - HIGH PRECISION');
+          this.isIntersected = true;
+          
+          // 遅延をクリアして即座に反応
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          // 視覚的フィードバック（黄色で強調）
+          this.el.setAttribute('material', 'opacity: 0.0; color: #ffff00; emissive: #444400');
+        },
+
+        onIntersectedCleared: function (evt) {
+          if (!this.isIntersected) return; // 重複防止
+          
+          console.log('Raycaster intersection cleared');
+          
+          // 少し遅延させてちらつきを防止
+          this.hoverTimeout = setTimeout(() => {
+            this.isIntersected = false;
+            this.isHovered = false;
+            // 元の状態に戻す
+            this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+          }, 50);
+        },
+
+        onCursorEnter: function (evt) {
+          console.log('Cursor entered - CURSOR EVENT');
+          this.isHovered = true;
+          
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #004400');
+        },
+
+        onCursorLeave: function (evt) {
+          console.log('Cursor left - CURSOR EVENT');
+          
+          this.hoverTimeout = setTimeout(() => {
+            this.isHovered = false;
+            if (!this.isIntersected) {
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+            }
+          }, 50);
+        },
+
+        onHover: function (evt) {
+          console.log('Mouse hover detected - MOUSE EVENT');
+          this.isHovered = true;
+          
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+            this.hoverTimeout = null;
+          }
+          
+          this.el.setAttribute('material', 'opacity: 0.0; color: #00ff00; emissive: #002200');
+        },
+
+        onHoverEnd: function (evt) {
+          console.log('Mouse hover ended - MOUSE EVENT');
+          
+          this.hoverTimeout = setTimeout(() => {
+            this.isHovered = false;
+            if (!this.isIntersected) {
+              this.el.setAttribute('material', 'opacity: 0.0; color: #ffffff; emissive: #000000');
+            }
+          }, 50);
+        },
+
+        onClick: function (evt) {
+          console.log('Click detected on clickable object', evt.type);
+          evt.preventDefault();
+          evt.stopPropagation();
+          
+          // NFT検出時のみクリック有効
+          const nftTarget = document.querySelector('#nft-target');
+          if (!nftTarget || !nftTarget.object3D.visible) {
+            console.log('NFT target not detected - click ignored');
+            return;
+          }
+          
+          // サウンド再生中はクリックを無効にする
+          if (this.isSoundPlaying) {
+            console.log('Sound is playing - click ignored');
+            return;
+          }
+          
+          // ダブルクリック検知（500ms以内の連続クリック）
+          const currentTime = Date.now();
+          if (currentTime - this.lastClickTime < 500) {
+            // ダブルクリック - カウンターをリセット
+            this.clickCount = 0;
+            this.updateClickDisplay();
+            console.log('Double click detected - counter reset');
+            this.showCelebrationMessage('🔄 カウンターリセット！');
+            this.lastClickTime = 0;
+            return;
+          }
+          this.lastClickTime = currentTime;
+          
+          // クリック回数を増加
+          this.clickCount++;
+          this.updateClickDisplay();
+          console.log('Click count:', this.clickCount);
+          
+          // クリックするたびにサウンドを再生
+          this.playClickSound();
+          
+          // 親要素（モデル本体）のコントローラーを取得
+          const modelController = this.el.parentNode.components['model-controller'];
+          if (modelController && modelController.currentState === 'initial') {
+            console.log('Triggering anime02 animation');
+            // anime02を1回再生
+            modelController.playAnimation('anime02', false);
+          } else {
+            console.log('Model controller not available or not in initial state - but sound still plays');
+          }
+        },
+
+        // クリック回数表示を更新する関数
+        updateClickDisplay: function () {
+          const clickCountElement = document.getElementById('click-count');
+          if (clickCountElement) {
+            clickCountElement.textContent = this.clickCount;
+            
+            // クリック時にアニメーション効果を追加
+            if (this.clickCount > 0) {
+              clickCountElement.style.transform = 'scale(1.2)';
+              clickCountElement.style.color = '#ffff00';
+              setTimeout(() => {
+                clickCountElement.style.transform = 'scale(1)';
+                clickCountElement.style.color = 'white';
+              }, 200);
+            }
+            
+            // 特定の回数でお祝いメッセージ
+            if (this.clickCount === 10) {
+              this.showCelebrationMessage('🎉 10回達成！');
+            } else if (this.clickCount === 50) {
+              this.showCelebrationMessage('🌟 50回達成！すごい！');
+            } else if (this.clickCount === 100) {
+              this.showCelebrationMessage('🏆 100回達成！素晴らしい！');
+            }
+          } else {
+            console.warn('Click count display element not found');
+          }
+        },
+
+        // お祝いメッセージを表示する関数
+        showCelebrationMessage: function (message) {
+          const counterDiv = document.getElementById('click-counter');
+          if (counterDiv) {
+            // 一時的にメッセージを表示
+            const originalText = counterDiv.innerHTML;
+            counterDiv.innerHTML = `<div style="color: #ffff00; font-size: 20px;">${message}</div>`;
+            counterDiv.style.background = 'rgba(255,215,0,0.9)';
+            counterDiv.style.color = 'black';
+            
+            setTimeout(() => {
+              counterDiv.innerHTML = originalText;
+              counterDiv.style.background = 'rgba(0,0,0,0.7)';
+              counterDiv.style.color = 'white';
+            }, 2000);
+          }
+        },
+
+        // クリック時のサウンド再生関数
+        playClickSound: function () {
+          try {
+            const soundElement = document.getElementById('sound01');
+            if (soundElement) {
+              // サウンド再生状態をtrueに設定
+              this.isSoundPlaying = true;
+              
+              // 既に再生中の場合は停止してから再生
+              soundElement.currentTime = 0;
+              const playPromise = soundElement.play();
+              
+              // サウンド終了イベントを監視
+              soundElement.addEventListener('ended', () => {
+                this.isSoundPlaying = false;
+                console.log('Sound playback finished - clicks enabled');
+              }, { once: true });
+              
+              // エラー時もサウンド状態をリセット
+              soundElement.addEventListener('error', () => {
+                this.isSoundPlaying = false;
+                console.log('Sound playback error - clicks enabled');
+              }, { once: true });
+              
+              if (playPromise !== undefined) {
+                playPromise.then(() => {
+                  console.log('Click sound started successfully - clicks disabled during playback');
+                }).catch(error => {
+                  console.warn('Click sound playback failed:', error);
+                  this.isSoundPlaying = false; // エラー時は状態をリセット
+                });
+              }
+            } else {
+              console.warn('Sound01 element not found');
+              this.isSoundPlaying = false;
+            }
+          } catch (error) {
+            console.error('Error playing click sound:', error);
+            this.isSoundPlaying = false; // エラー時は状態をリセット
+          }
+        },
+
+        remove: function () {
+          // クリーンアップ
+          if (this.mouseMonitorInterval) {
+            clearInterval(this.mouseMonitorInterval);
+          }
+          if (this.hoverTimeout) {
+            clearTimeout(this.hoverTimeout);
+          }
+          
+          // サウンド状態をリセット
+          this.isSoundPlaying = false;
+          
+          // サウンド要素の停止
+          const soundElement = document.getElementById('sound01');
+          if (soundElement) {
+            soundElement.pause();
+            soundElement.currentTime = 0;
+          }
+        }
+      });
+      
+      // マーカー検出状況を監視
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('Setting up marker detection monitoring...');
+        
+        // A-Sceneが準備完了したら監視開始
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+          scene.addEventListener('loaded', function() {
+            console.log('A-Scene loaded, setting up NFT listeners...');
+            
+            const nftTarget = document.querySelector('#nft-target');
+            if (nftTarget) {
+              console.log('NFT element found, adding event listeners...');
+              
+              // モデル要素の確認
+              const modelElement = document.querySelector('#main-model');
+              if (modelElement) {
+                console.log('✅ Model element found:', modelElement);
+                
+                // モデル読み込み完了チェック
+                modelElement.addEventListener('model-loaded', () => {
+                  console.log('🎉 3D Model loaded successfully!');
+                });
+                
+                // GLTFコンポーネントの読み込み状況チェック
+                setTimeout(() => {
+                  const gltfComponent = modelElement.components['gltf-model'];
+                  if (gltfComponent) {
+                    console.log('📦 GLTF Component status:', gltfComponent.data, gltfComponent.model);
+                  } else {
+                    console.error('❌ GLTF component not found on model element');
+                  }
+                }, 2000);
+              } else {
+                console.error('❌ Model element (#main-model) not found!');
+              }
+              
+              // NFT検出イベント
+              nftTarget.addEventListener('trackingFound', function() {
+                console.log('✅ NFT target found - 3D model should be visible');
+                document.getElementById('debug-info').innerHTML = 
+                  '<div style="color: #00ff00;">📍 NFT認識中: 3Dモデルが表示されています</div>';
+              });
+              
+              // NFT喪失イベント
+              nftTarget.addEventListener('trackingLost', function() {
+                console.log('❌ NFT target lost - 3D model should be hidden');
+                document.getElementById('debug-info').innerHTML = 
+                  '<div style="color: #ff9900;">📱 NFT未検出: リファレンス画像をカメラに映してください</div>';
+              });
+              
+              // NFT読み込み状況を監視
+              setTimeout(() => {
+                console.log('Checking NFT loading status...');
+                document.getElementById('debug-info').innerHTML = 
+                  '<div style="color: #00ffff;">🎯 NFTファイル読み込み完了 - 画像認識を開始してください</div>';
+              }, 3000);
+              
+              console.log('NFT event listeners set up successfully');
+            } else {
+              console.warn('NFT target element not found');
+              document.getElementById('debug-info').innerHTML = 
+                '<div style="color: #ff0000;">❌ エラー: NFT要素が見つかりません</div>';
+            }
+          });
+          
+          // AR.js初期化完了を監視
+          scene.addEventListener('arjs-video-loaded', function() {
+            console.log('� AR.js video loaded successfully');
+            document.getElementById('debug-info').innerHTML = 
+              '<div style="color: #ffff00;">� カメラ準備完了 - NFT読み込み中...</div>';
+          });
+        }
+      });
+    </script>
+    <title>**0919nft１４***</title>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    
+    <!-- クリック回数表示 -->
+    <div id="click-counter" style="position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; border-radius: 10px; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; z-index: 1000;">
+      クリック回数: <span id="click-count">0</span>
+    </div>
+    
+    <!-- デバッグ情報表示 -->
+    <div id="debug-info" style="position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 10px; font-family: Arial, sans-serif; font-size: 16px; max-width: 400px; z-index: 1000;">
+      <div style="color: #ffff00;">🔍 NFT初期化中... しばらくお待ちください</div>
+    </div>
+	  
+    <!-- A-FrameにAR.jsを紐づけ、NFT専用設定 -->
+    <a-scene embedded 
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+      vr-mode-ui="enabled: false;"
+      renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true; precision: mediump;"
+      camera="far: 10000; near: 0.01;"
+      loading-screen="enabled: false;"
+      inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js"
+      device-orientation-permission-ui="enabled: false">
+  
+      <a-assets>
+        <a-asset-item id="neko" src="./asset/3Dmodel.glb"></a-asset-item>
+        <audio id="sound01" src="./asset/sound01.mp3" preload="auto"></audio>
+      </a-assets>
+
+      <!-- 環境光を追加 -->
+      <a-light type="ambient" color="#ffffff" intensity="0.8"></a-light>
+      <a-light type="directional" position="0 10 5" color="#ffffff" intensity="0.5"></a-light>
+
+      <a-nft 
+        type="nft" 
+        url="./asset/reference-image"
+        smooth="true" 
+        smoothCount="10" 
+        smoothTolerance="0.01" 
+        smoothThreshold="5"
+        emitevents="true"
+        id="nft-target"
+        markerhandler>
+    
+        <!-- 大きなテスト用ボックス（確実に見えるように） -->
+        <a-box
+          color="orange"
+          scale="50 50 50"
+          position="0 0 0"
+          material="color: orange; emissive: #ff4400; metalness: 0;">
+        </a-box>
+        
+        <!-- カメラに近い位置（20cm程度）に配置 - NFT座標系用小スケール -->
+        <!-- 中央の赤いボックス -->
+        <a-box
+          color="red"
+          scale="0.05 0.05 0.05"
+          position="0 0 0"
+          material="color: red; metalness: 0.1; roughness: 0.5;">
+        </a-box>
+        
+        <!-- 緑のボックス（右側） -->
+        <a-box
+          color="green"
+          scale="0.04 0.04 0.04"
+          position="0.1 0 0"
+          material="color: green;">
+        </a-box>
+        
+        <!-- 青のボックス（左側） -->
+        <a-box
+          color="blue"
+          scale="0.04 0.04 0.04"
+          position="-0.1 0 0"
+          material="color: blue;">
+        </a-box>
+        
+        <!-- 黄色のボックス（上側） -->
+        <a-box
+          color="yellow"
+          scale="0.04 0.04 0.04"
+          position="0 0.1 0"
+          material="color: yellow;">
+        </a-box>
+        
+        <!-- マゼンタのボックス（下側） -->
+        <a-box
+          color="magenta"
+          scale="0.04 0.04 0.04"
+          position="0 -0.1 0"
+          material="color: magenta;">
+        </a-box>
+        
+        <!-- 白いボックス（手前に大きく） -->
+        <a-box
+          color="white"
+          scale="0.06 0.06 0.06"
+          position="0 0 0.05"
+          material="color: white;">
+        </a-box>
+        
+        <!-- シアンのボックス（奥側） -->
+        <a-box
+          color="cyan"
+          scale="0.045 0.045 0.045"
+          position="0 0 -0.05"
+          material="color: cyan;">
+        </a-box>
+        
+        <!-- 3Dモデル（中央やや上） - NFT座標系調整 -->
+        <a-entity
+          id="main-model"
+          gltf-model="#neko"
+          scale="0.05 0.05 0.05"
+          position="0 0.05 0.02"
+          rotation="0 0 0"
+          model-controller>
+        </a-entity>
+        
+        <!-- クリック判定用の透明なボックス - NFT座標系調整 -->
+        <a-box
+          clickable
+          scale="0.2 0.2 0.2"
+          position="0 0 0"
+          material="opacity: 0.0; transparent: true; color: #ffffff; side: double"
+          geometry="primitive: box"
+          class="clickable"
+          raycaster-listen>
+        </a-box>
+      </a-nft>
+
+      <a-entity camera
+        look-controls="enabled: false; magicWindowTrackingEnabled: false;"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable; far: 10000; near: 0.01;">
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
