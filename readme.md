@@ -109,7 +109,7 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
           this.el.setAttribute('animation__position', {
             property: 'position',
             to: this.data.moveToPosition,
-            dur: 3000, // 3秒かけて移動
+            dur: 2000, // 2秒かけて移動
             easing: 'easeInOutQuad'
           });
 
@@ -117,10 +117,39 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
           this.el.addEventListener('animationcomplete__position', () => {
             if (this.currentState === 'initial') {
               this.currentState = 'moved';
-              // 移動完了後、anime01のループ再生に戻る
+              // 移動完了後、短時間anime01を再生してからモデルを非表示
               this.playAnimation('anime01', true);
+              
+              // 1秒後にモデルを非表示にして次のページに遷移
+              setTimeout(() => {
+                this.hideModelAndNavigate();
+              }, 1000);
             }
           }, { once: true });
+        },
+
+        // モデルを非表示にして次のページに遷移
+        hideModelAndNavigate: function () {
+          // モデルを非表示
+          this.el.setAttribute('visible', false);
+          
+          // クリック回数を保存
+          this.saveClickCount();
+          
+          // 次のページに遷移
+          setTimeout(() => {
+            window.location.href = 'http://localhost:8080/';
+          }, 500);
+        },
+
+        // クリック回数を保存
+        saveClickCount: function () {
+          const clickableComponent = this.el.querySelector('[clickable]');
+          if (clickableComponent && clickableComponent.components.clickable) {
+            const clickCount = clickableComponent.components.clickable.clickCount;
+            localStorage.setItem('arClickCount', clickCount);
+            console.log('Click count saved:', clickCount);
+          }
         }
       });
 
@@ -136,6 +165,9 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
           this.isSoundPlaying = false; // サウンド再生状態を管理
           this.clickCount = 0; // クリック回数を管理
           this.lastClickTime = 0; // ダブルクリック検知用
+          
+          // 保存されたクリック回数を読み込み
+          this.loadClickCount();
           
           // クリック回数表示を初期化
           this.updateClickDisplay();
@@ -305,6 +337,17 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
           }
         },
 
+        // 保存されたクリック回数を読み込む関数
+        loadClickCount: function () {
+          const savedClickCount = localStorage.getItem('arClickCount');
+          if (savedClickCount !== null) {
+            this.clickCount = parseInt(savedClickCount, 10);
+            console.log('Click count loaded:', this.clickCount);
+          } else {
+            this.clickCount = 0;
+          }
+        },
+
         // クリック回数表示を更新する関数
         updateClickDisplay: function () {
           const clickCountElement = document.getElementById('click-count');
@@ -322,12 +365,12 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
             }
             
             // 特定の回数でお祝いメッセージ
-            if (this.clickCount === 10) {
-              this.showCelebrationMessage('🎉 10回達成！');
-            } else if (this.clickCount === 50) {
-              this.showCelebrationMessage('🌟 50回達成！すごい！');
-            } else if (this.clickCount === 100) {
-              this.showCelebrationMessage('🏆 100回達成！素晴らしい！');
+            if (this.clickCount === 5) {
+              this.showCelebrationMessage('🎉 5回達成！');
+            } else if (this.clickCount === 10) {
+              this.showCelebrationMessage('🌟 10回達成！すごい！');
+            } else if (this.clickCount === 15) {
+              this.showCelebrationMessage('🏆 15回達成！素晴らしい！');
             }
           } else {
             console.warn('Click count display element not found');
@@ -445,7 +488,7 @@ A-FrameとAR.jsを使用したマーカーベースARアプリケーション
         }
       });
     </script>
-    <title>**20250919***</title>
+    <title>**0919-2***</title>
   </head>
   <body style="margin: 0; overflow: hidden">
     
